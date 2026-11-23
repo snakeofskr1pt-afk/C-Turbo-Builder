@@ -1,0 +1,12 @@
+{
+  "compiler": "g++",
+  "flags": ["-O2", "-std=c++20"],
+  "include": ["include"],
+  "defines": {
+    "DEMO_BUILD": null
+  },
+  "exclude": ["third_party"],
+  "chunkSize": 2,
+  "jobs": 4,
+  "out": "app.exe"
+}

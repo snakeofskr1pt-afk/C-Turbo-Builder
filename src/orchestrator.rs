@@ -46,6 +46,10 @@ pub struct BuildConfig {
     pub linker: Option<PathBuf>,
     pub proxy: ProxyOptions,
     pub quiet: bool,
+    /// Extra directory names to skip while discovering sources (`turbo.json`).
+    pub exclude_dirs: Vec<String>,
+    /// Flags appended to the link command only (`turbo.json: linkFlags`).
+    pub link_flags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -98,13 +102,19 @@ fn has_source_extension(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn should_skip_dir(name: &str) -> bool {
+fn should_skip_dir(name: &str, extra_excludes: &[String]) -> bool {
     let lower = name.to_ascii_lowercase();
-    lower.starts_with('.') || SKIP_DIRS.contains(&lower.as_str())
+    lower.starts_with('.')
+        || SKIP_DIRS.contains(&lower.as_str())
+        || extra_excludes
+            .iter()
+            .any(|excluded| excluded.eq_ignore_ascii_case(&lower))
 }
 
 /// Recursively collect `.cpp`/`.cc`/... files under `root`, sorted, absolute.
-pub fn discover_sources(root: &Path) -> TurboResult<Vec<PathBuf>> {
+///
+/// `extra_excludes` are directory names (case-insensitive) from `turbo.json`.
+pub fn discover_sources(root: &Path, extra_excludes: &[String]) -> TurboResult<Vec<PathBuf>> {
     if !root.is_dir() {
         return Err(TurboError::msg(format!(
             "project root `{}` is not a directory",
@@ -134,7 +144,7 @@ pub fn discover_sources(root: &Path) -> TurboResult<Vec<PathBuf>> {
             let path = entry.path();
             if file_type.is_dir() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                if !should_skip_dir(&name) {
+                if !should_skip_dir(&name, extra_excludes) {
                     stack.push(path);
                 }
             } else if file_type.is_file() && has_source_extension(&path) {
@@ -228,7 +238,7 @@ fn write_unity_files(
 /// exit code to propagate.
 pub fn build(spec: &CompilerSpec, cfg: &BuildConfig) -> TurboResult<BuildResult> {
     let started = Instant::now();
-    let sources = discover_sources(&cfg.root)?;
+    let sources = discover_sources(&cfg.root, &cfg.exclude_dirs)?;
     if sources.is_empty() {
         return Err(TurboError::msg(format!(
             "no C/C++ sources found under `{}`",
@@ -349,6 +359,8 @@ pub fn build(spec: &CompilerSpec, cfg: &BuildConfig) -> TurboResult<BuildResult>
         Some(linker) => spec.link_command_with(linker, &objects, &summary.output),
         None => spec.link_command(&objects, &summary.output),
     };
+    // Linker-only flags from `turbo.json` (libraries, /LIBPATH, ...).
+    command.args(&cfg.link_flags);
     if !cfg.quiet {
         eprintln!(
             "[turbo] linking {} object(s) -> {}",
@@ -432,7 +444,7 @@ mod tests {
         fs::write(dir.join(".git/hook.cpp"), "int h();\n").unwrap();
         fs::write(dir.join("target/t.cpp"), "int t();\n").unwrap();
 
-        let sources = discover_sources(&dir).unwrap();
+        let sources = discover_sources(&dir, &[]).unwrap();
         let names: Vec<String> = sources
             .iter()
             .map(|p| {
@@ -442,6 +454,30 @@ mod tests {
             })
             .collect();
         assert_eq!(names, vec!["a.cpp", "b.cc", "c.cxx"]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn extra_excludes_from_config_are_honoured() {
+        let dir = std::env::temp_dir().join(format!("turbo-excl-{}", util::unique_token()));
+        fs::create_dir_all(dir.join("src")).unwrap();
+        fs::create_dir_all(dir.join("tools")).unwrap();
+        fs::create_dir_all(dir.join("tests")).unwrap();
+        fs::write(dir.join("src/a.cpp"), "int a();\n").unwrap();
+        fs::write(dir.join("tools/gen.cpp"), "int g();\n").unwrap();
+        fs::write(dir.join("tests/t.cpp"), "int t();\n").unwrap();
+
+        // Default scan sees everything.
+        let all = discover_sources(&dir, &[]).unwrap();
+        assert_eq!(all.len(), 3);
+
+        // Config exclusions are case-insensitive directory names.
+        let excluded = discover_sources(&dir, &["tests".to_string(), "TOOLS".to_string()]).unwrap();
+        let names: Vec<String> = excluded
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, vec!["a.cpp"]);
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -7,7 +7,7 @@
 //! turbo cache dir|stats|clear [--cache-dir DIR]
 //! ```
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use turbo::compiler::{parse_invocation, CompilerSpec};
 use turbo::orchestrator::{self, BuildConfig, BuildResult, DEFAULT_CHUNK_SIZE};
@@ -26,18 +26,27 @@ USAGE
                turbo fastcache -- g++ -Iinclude -c src/a.cpp -o build/a.o
 
   turbo build [--root DIR] [--jobs N] [--chunk-size N] [--out FILE]
-              [--linker PATH] [--cache-dir DIR] [--quiet] [-v]
+              [--linker PATH] [--cache-dir DIR] [--config FILE] [--no-config]
+              [--quiet] [-v]
               -- <compiler> <compile flags...>
       Find all sources, glue them into unity chunks, compile in parallel through
-      the cache, then link the executable.
+      the cache, then link the executable. Without `--`, the compiler and flags
+      are taken from turbo.json.
       Example: turbo build -- g++ -Iinclude -O2
                turbo build --root . --out app.exe -- cl /O2 /Iinclude
+               turbo build --root examples/cpp_demo          (turbo.json driven)
 
   turbo hash [--manifest] -- <compiler> <compile flags...>
       Print the cache key and which files it covers (debugging tool).
 
   turbo cache dir|stats|clear [--cache-dir DIR]
       Inspect or wipe the object cache.
+
+CONFIG (turbo.json)
+  Place it in the project root (or pass --config FILE; --no-config ignores it).
+  Keys: \"compiler\", \"flags\", \"include\", \"defines\", \"exclude\", \"chunkSize\",
+  \"jobs\", \"out\", \"linker\", \"linkFlags\". Relative \"include\"/\"out\"/\"linker\"
+  paths resolve against the config file's directory. Command-line values win.
 
 ENVIRONMENT
   TURBO_CACHE_DIR   cache location (default: %LOCALAPPDATA%\\cpp-turbo-cache)
@@ -200,38 +209,51 @@ fn cmd_hash(argv: Vec<String>) -> turbo::TurboResult<i32> {
 
 fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
     let (options, command_line) = split_at_double_dash(argv);
-    let mut root = std::env::current_dir()?;
-    let mut jobs = util::default_jobs();
-    let mut chunk_size = DEFAULT_CHUNK_SIZE;
-    let mut output: Option<PathBuf> = None;
-    let mut linker: Option<PathBuf> = None;
+
+    // CLI values stay optional: turbo.json fills the gaps, built-in defaults the rest.
+    let mut root_arg: Option<PathBuf> = None;
+    let mut jobs_arg: Option<usize> = None;
+    let mut chunk_size_arg: Option<usize> = None;
+    let mut output_arg: Option<PathBuf> = None;
+    let mut linker_arg: Option<PathBuf> = None;
     let mut cache_dir = util::cache_dir();
+    let mut config_arg: Option<PathBuf> = None;
+    let mut no_config = false;
     let mut verbose = util::env_verbose();
     let mut quiet = false;
 
     let mut index = 0usize;
     while index < options.len() {
         match options[index].as_str() {
-            "--root" => root = PathBuf::from(take_value(&options, &mut index, "--root")?),
+            "--root" => root_arg = Some(PathBuf::from(take_value(&options, &mut index, "--root")?)),
             "--jobs" | "-j" => {
                 let raw = take_value(&options, &mut index, "--jobs")?;
-                jobs = parse_usize(&raw, "--jobs")?;
-                if jobs == 0 {
+                let value = parse_usize(&raw, "--jobs")?;
+                if value == 0 {
                     return Err(TurboError::msg("--jobs must be at least 1"));
                 }
+                jobs_arg = Some(value);
             }
             "--chunk-size" => {
                 let raw = take_value(&options, &mut index, "--chunk-size")?;
-                chunk_size = parse_usize(&raw, "--chunk-size")?;
-                if chunk_size == 0 {
+                let value = parse_usize(&raw, "--chunk-size")?;
+                if value == 0 {
                     return Err(TurboError::msg("--chunk-size must be at least 1"));
                 }
+                chunk_size_arg = Some(value);
             }
             "--out" | "-o" => {
-                output = Some(PathBuf::from(take_value(&options, &mut index, "--out")?))
+                output_arg = Some(PathBuf::from(take_value(&options, &mut index, "--out")?))
             }
             "--linker" => {
-                linker = Some(PathBuf::from(take_value(&options, &mut index, "--linker")?))
+                linker_arg = Some(PathBuf::from(take_value(&options, &mut index, "--linker")?))
+            }
+            "--config" => {
+                config_arg = Some(PathBuf::from(take_value(&options, &mut index, "--config")?))
+            }
+            "--no-config" => {
+                no_config = true;
+                index += 1;
             }
             "--cache-dir" => {
                 cache_dir = PathBuf::from(take_value(&options, &mut index, "--cache-dir")?)
@@ -252,19 +274,76 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
         }
     }
 
-    if command_line.is_empty() {
+    // --- locate the project root and turbo.json ---------------------------
+    let invocation_dir = std::env::current_dir()?;
+    let root_hint = root_arg.clone().unwrap_or_else(|| invocation_dir.clone());
+    let config_path: Option<PathBuf> = if no_config {
+        None
+    } else {
+        Some(util::absolute(
+            &config_arg
+                .clone()
+                .unwrap_or_else(|| root_hint.join("turbo.json")),
+        ))
+    };
+    let config = match &config_path {
+        Some(path) => {
+            let loaded = turbo::config::Config::load(path).map_err(TurboError::msg)?;
+            if verbose && loaded.is_some() {
+                eprintln!("[turbo] config: {}", path.display());
+            }
+            loaded.unwrap_or_default()
+        }
+        None => turbo::config::Config::default(),
+    };
+    let config_dir = config_path
+        .as_ref()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
+        .unwrap_or_else(|| root_hint.clone());
+
+    let root = match &root_arg {
+        Some(root) => util::absolute(root),
+        // `--config elsewhere/turbo.json` without `--root`: the config's
+        // directory is the project root.
+        None => match &config_arg {
+            Some(config_file) => util::absolute(
+                config_file
+                    .parent()
+                    .filter(|parent| !parent.as_os_str().is_empty())
+                    .unwrap_or_else(|| Path::new(".")),
+            ),
+            None => invocation_dir.clone(),
+        },
+    };
+
+    // --- compiler and flags: CLI `-- ...` beats turbo.json ----------------
+    let (program, cli_flags): (PathBuf, Vec<String>) = if !command_line.is_empty() {
+        (PathBuf::from(&command_line[0]), command_line[1..].to_vec())
+    } else if let Some(compiler) = &config.compiler {
+        (PathBuf::from(compiler), Vec::new())
+    } else {
         return Err(TurboError::msg(
-            "build needs a compiler after `--`, e.g. `turbo build -- g++ -Iinclude -O2`",
+            "build needs a compiler: pass `-- <compiler> [flags]` or set \"compiler\" in turbo.json",
         ));
-    }
+    };
 
-    let root = util::absolute(&root);
-    let program = PathBuf::from(&command_line[0]);
-    let cwd = std::env::current_dir()?;
-    let spec = CompilerSpec::new(program, command_line[1..].to_vec(), cwd);
-    let output = output.unwrap_or_else(|| root.join(default_executable_name()));
+    let toolchain = turbo::compiler::detect(&program);
+    let mut user_flags = config.compile_flags(toolchain, &config_dir);
+    user_flags.extend(cli_flags);
+    let spec = CompilerSpec::new(program, user_flags, invocation_dir);
 
-    let config = BuildConfig {
+    // --- effective settings: CLI > turbo.json > defaults ------------------
+    let jobs = jobs_arg.or(config.jobs).unwrap_or_else(util::default_jobs);
+    let chunk_size = chunk_size_arg
+        .or(config.chunk_size)
+        .unwrap_or(DEFAULT_CHUNK_SIZE);
+    let output = output_arg
+        .or_else(|| config.out.as_ref().map(|out| config_dir.join(out)))
+        .unwrap_or_else(|| root.join(default_executable_name()));
+    let linker =
+        linker_arg.or_else(|| config.linker.as_ref().map(|linker| config_dir.join(linker)));
+
+    let build_config = BuildConfig {
         root,
         jobs,
         chunk_size,
@@ -272,9 +351,11 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
         linker,
         proxy: ProxyOptions::new(cache_dir, verbose),
         quiet,
+        exclude_dirs: config.exclude.clone(),
+        link_flags: config.link_flags.clone(),
     };
 
-    match orchestrator::build(&spec, &config)? {
+    match orchestrator::build(&spec, &build_config)? {
         BuildResult::Success(summary) => {
             print_summary(&summary);
             eprintln!("[turbo] executable -> {}", summary.output.display());

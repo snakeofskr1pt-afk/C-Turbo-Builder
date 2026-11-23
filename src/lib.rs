@@ -13,6 +13,7 @@
 
 pub mod cachekey;
 pub mod compiler;
+pub mod config;
 pub mod includes;
 pub mod orchestrator;
 pub mod proxy;

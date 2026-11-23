@@ -48,10 +48,15 @@ $buildDir = Join-Path $Root ".build"
 
 function Invoke-Build {
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    # Windows PowerShell 5.1 turns native stderr into error records; we only care
+    # about the exit code, so keep ErrorActionPreference relaxed for the call.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     & $turbo build --root $Root --jobs $Jobs --chunk-size $ChunkSize `
         --out $output --cache-dir $CacheDir --quiet `
-        -- $Compiler @compilerFlags 2>$null
+        -- $Compiler @compilerFlags 2>&1 | Out-Null
     $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previous
     $stopwatch.Stop()
     if ($exitCode -ne 0) {
         throw "turbo build failed with exit code $exitCode"

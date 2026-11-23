@@ -404,6 +404,109 @@ fn parallel_build_uses_multiple_workers() {
 }
 
 #[test]
+fn turbo_json_drives_build_and_cli_wins() {
+    let sandbox = Sandbox::new("config");
+    sandbox.write("include/cfg.h", "#pragma once\n#define CFG 1\n");
+    sandbox.write("src/a.cpp", "#include <cfg.h>\nint a(){return CFG;}\n");
+    sandbox.write("src/b.cpp", "#include <cfg.h>\nint b(){return CFG;}\n");
+    sandbox.write("src/c.cpp", "int c(){return 0;}\n");
+    // Excluded through turbo.json: must not appear in the build.
+    sandbox.write("tools/gen.cpp", "int gen(){return 1;}\n");
+
+    let mockcc_json = MOCKCC.replace('\\', "\\\\");
+    let config = format!(
+        r#"{{
+            "compiler": "{mockcc_json}",
+            "include": ["include"],
+            "defines": {{ "NDEBUG": null }},
+            "exclude": ["tools"],
+            "chunkSize": 1,
+            "jobs": 2,
+            "out": "cfg.exe"
+        }}"#
+    );
+    sandbox.write("turbo.json", &config);
+
+    // No `--` at all: compiler, include dir, chunk size and output come from
+    // turbo.json; three sources (tools/ is excluded) at chunk size 1.
+    let mut command = sandbox.command();
+    command.args(["build", "--root", "."]);
+    let output = command.output().expect("run turbo build");
+    assert_success(&output);
+    assert_eq!(sandbox.compile_count(), 3, "chunk size 1 → 3 compilations");
+    assert!(
+        sandbox.dir.join("cfg.exe").is_file(),
+        "output name must come from turbo.json"
+    );
+
+    // Second run: fully cached.
+    let mut command = sandbox.command();
+    command.args(["build", "--root", "."]);
+    assert_success(&command.output().expect("run turbo build"));
+    assert_eq!(sandbox.compile_count(), 3, "config build must be cacheable");
+
+    // The config's include dir really is used: editing <cfg.h> invalidates the
+    // two chunks that include it (a and b), not the one that does not (c).
+    sandbox.write("include/cfg.h", "#pragma once\n#define CFG 2\n");
+    let mut command = sandbox.command();
+    command.args(["build", "--root", "."]);
+    assert_success(&command.output().expect("run turbo build"));
+    assert_eq!(
+        sandbox.compile_count(),
+        5,
+        "header reached through the config's -I must invalidate its dependents"
+    );
+
+    // Command line overrides the config (chunk size 2, different output).
+    let mut command = sandbox.command();
+    command
+        .args([
+            "build",
+            "--root",
+            ".",
+            "--chunk-size",
+            "2",
+            "--out",
+            "cli.exe",
+            "--",
+        ])
+        .arg(MOCKCC);
+    assert_success(&command.output().expect("run turbo build"));
+    assert!(
+        sandbox.dir.join("cli.exe").is_file(),
+        "CLI --out must beat turbo.json out"
+    );
+    assert_eq!(
+        sandbox.compile_count(),
+        7,
+        "chunk size 2 → two new chunks on top of the five compilations"
+    );
+
+    // --no-config drops turbo.json: no compiler anywhere → usage error.
+    let mut command = sandbox.command();
+    command.args(["build", "--root", ".", "--no-config"]);
+    let output = command.output().expect("run turbo build");
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn broken_turbo_json_is_reported() {
+    let sandbox = Sandbox::new("badconfig");
+    sandbox.write("src/a.cpp", "int a();\n");
+    sandbox.write("turbo.json", "{ this is not json");
+
+    let mut command = sandbox.command();
+    command.args(["build", "--root", "."]);
+    let output = command.output().expect("run turbo build");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("turbo.json"),
+        "error must name the config file, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn tool_errors_exit_with_code_two() {
     let sandbox = Sandbox::new("usage");
 
