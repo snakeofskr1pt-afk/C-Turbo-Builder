@@ -7,22 +7,28 @@
 
 ## 1. Repository description («About»)
 
-> GitHub обмежує поле About ~350 символами. Бери один варіант і вставляй у
+> GitHub обмежує поле About **350 символами** (усі варіанти нижче влазять). Бери один і вставляй у
 > Settings → General → Description (або шестірня біля About).
 
-### Рекомендований (180 символів)
+### Максимальна — 332 з 350 (найбільше інформації, що влазить)
+
+```
+Content-addressed compile cache + Unity Build orchestrator for C++: hashes source, every included header, flags and compiler identity; reuses cached object files; compiles Unity chunks in parallel; links the app. Drop-in launcher for CMake/make, or standalone build. One static binary, no dependencies, MIT, 62 tests, Windows/Linux.
+```
+
+### Рекомендований (187 символів)
 
 ```
 Content-addressed compile cache + Unity Build orchestrator for C++: hashes sources, headers, flags and compiler; reuses cached objects; compiles chunks in parallel. One binary, zero deps.
 ```
 
-### Короткий (112 символів)
+### Короткий (107 символів)
 
 ```
 C++ build accelerator: content-addressed object cache + parallel Unity Build in one zero-dependency binary.
 ```
 
-### Технічний — для тих, хто шукає ccache-альтернативу (146 символів)
+### Технічний — для тих, хто шукає ccache-альтернативу (152 символи)
 
 ```
 ccache-style object cache keyed on source + all headers + flags + compiler identity, plus parallel Unity Build orchestration for g++ / clang++ / cl.exe.
