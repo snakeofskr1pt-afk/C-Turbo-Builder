@@ -364,10 +364,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1 -Root . -Compiler g
 
 ```powershell
 # спочатку подивитись, що буде зроблено, без мережі:
-powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git -DryRun
+powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/snakeofskr1pt-afk/C-Turbo-Builder.git -DryRun
 
 # потім реально:
-powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git
+powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/snakeofskr1pt-afk/C-Turbo-Builder.git
 ```
 
 Скрипт перевіряє git/коміти/identity, додає або оновлює `origin`, пушить `main`, створює тег
@@ -377,7 +377,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://
 **Варіант 2 — вручну:**
 
 ```powershell
-git remote add origin https://github.com/<ваш-акаунт>/cpp-turbo-builder.git
+git remote add origin https://github.com/snakeofskr1pt-afk/C-Turbo-Builder.git
 git branch -M main
 git push -u origin main
 

@@ -6,6 +6,8 @@ rust-version = "1.70"
 description = "Zero-dependency compile cache proxy and Unity Build orchestrator for C++"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/snakeofskr1pt-afk/C-Turbo-Builder"
+homepage = "https://github.com/snakeofskr1pt-afk/C-Turbo-Builder"
 keywords = ["cpp", "build", "cache", "unity-build", "compiler"]
 categories = ["development-tools::build-utils"]
 

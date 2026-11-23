@@ -19,7 +19,8 @@ param(
     [string]$RepoUrl = "",
     [string]$Tag = "v0.1.0",
     [switch]$SkipTag,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +42,19 @@ function Invoke-Git {
     if ($code -ne 0) {
         throw "FAILED ($code): $display"
     }
+}
+
+function Get-RemoteHeads {
+    # Returns the remote branches; an empty result means "empty repository".
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $lines = & git ls-remote --heads origin 2>$null
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+    if ($code -ne 0) {
+        throw "Cannot reach origin ($RepoUrl). Check the network, the URL and your credentials (git ls-remote exited with $code)."
+    }
+    return @($lines | Where-Object { $_ -and $_.Trim() })
 }
 
 Push-Location $repo
@@ -96,8 +110,32 @@ try {
     }
 
     Write-Host ""
+    if (-not $DryRun) {
+        $remoteHeads = Get-RemoteHeads
+        if ($remoteHeads.Count -gt 0 -and -not $Force) {
+            throw @"
+The GitHub repository is NOT empty - it already has commits (usually a README
+or .gitignore created through the web UI). A plain push would be rejected.
+
+Options:
+  A) Easiest: delete that repository on GitHub and create a new EMPTY one
+     (no README, no .gitignore, no license), then rerun this script.
+  B) Keep the remote history and merge it manually:
+       git pull --rebase origin $branch --allow-unrelated-histories
+       git push -u origin $branch
+     then rerun this script to publish the tag ($Tag).
+  C) Overwrite the remote branch (destroys those remote commits):
+       rerun this script with -Force
+"@
+        }
+    }
+
     Write-Host "Pushing $branch ..."
-    Invoke-Git @("push", "-u", "origin", $branch)
+    if ($Force) {
+        Invoke-Git @("push", "--force-with-lease", "-u", "origin", $branch)
+    } else {
+        Invoke-Git @("push", "-u", "origin", $branch)
+    }
 
     if (-not $SkipTag) {
         $tags = @(& git tag)

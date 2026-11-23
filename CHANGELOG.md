@@ -42,4 +42,4 @@ with nothing but `rustc`.
 - No PCH support; the include scanner is intentionally naive (safe over-approximation).
 - Two simultaneous misses on the same key may compile twice (correct, just redundant).
 
-[0.1.0]: https://github.com/USER/cpp-turbo-builder/releases/tag/v0.1.0
+[0.1.0]: https://github.com/snakeofskr1pt-afk/C-Turbo-Builder/releases/tag/v0.1.0

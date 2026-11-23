@@ -57,7 +57,7 @@ project (chunks are fewer compiler invocations, but big TUs cost more than small
 Honest v0.1.0 caveats: not yet validated against a real MSVC/GCC toolchain by the author, system
 headers are not hashed, no PCH support yet.
 
-Repo: https://github.com/<account>/cpp-turbo-builder
+Repo: https://github.com/snakeofskr1pt-afk/C-Turbo-Builder
 ```
 
 ### Social preview (картинка 1280×640, текст на ній)
