@@ -1,0 +1,65 @@
+name: Release
+
+# Push a tag to publish prebuilt binaries, e.g.:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Users who download the release do NOT need Rust: turbo.exe is a single static
+# executable. They only need a C++ compiler (g++/cl) for their own project.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: windows-x64 (static, no VC++ runtime needed)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Build
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: cargo build --release --offline --target x86_64-pc-windows-msvc
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/turbo.exe dist/
+          Copy-Item README.md dist/
+          Copy-Item LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath "turbo-${{ github.ref_name }}-windows-x64.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: turbo-${{ github.ref_name }}-windows-x64.zip
+          body: |
+            Prebuilt `turbo.exe` — single static binary, **Rust is not required**.
+
+            You still need a C++ compiler on your machine (`g++` or `cl.exe`):
+            `turbo` is a cache/orchestrator on top of it, not a compiler itself.
+
+  linux:
+    name: linux-x64
+    runs-on: ubuntu-latest
+    # Runs after Windows so both jobs attach assets to the same release without
+    # racing to create it.
+    needs: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release --offline
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/release/turbo dist/
+          cp README.md LICENSE dist/
+          tar -czf "turbo-${GITHUB_REF_NAME}-linux-x64.tar.gz" -C dist .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: turbo-${{ github.ref_name }}-linux-x64.tar.gz

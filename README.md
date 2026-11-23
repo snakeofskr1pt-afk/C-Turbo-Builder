@@ -324,4 +324,36 @@ git branch -M main
 git push -u origin main
 ```
 
+### Що отримає той, хто скачав (Rust не потрібен)
+
+`turbo` — це один самодостатній `.exe` (~0.7 МБ), без інсталятора, без DLL поруч, без Rust:
+
+```powershell
+# так виглядає робота для користувача релізу:
+turbo.exe build --root C:\work\mygame --jobs 16 --chunk-size 10 -- g++ -Iinclude -O2
+turbo.exe cache stats
+```
+
+| Хто | Що треба встановити |
+|---|---|
+| Скачав готовий реліз | **Нічого**, крім C++ компілятора (`g++` або `cl.exe`) — це інструмент *над* компілятором, а не замість нього |
+| Збирає з вихідників | Rust 1.70+ (`cargo build --release`; офлайн, бо залежностей немає) |
+| Хоче працювати без C++ компілятора | Не вийде: `turbo` лише кешує й оркеструє, компілює `g++`/`cl` |
+
+Кеш у кожного користувача свій: `%LOCALAPPDATA%\cpp-turbo-cache` (можна змінити `TURBO_CACHE_DIR`
+або `--cache-dir`).
+
+### Як випустити реліз
+
+У репо вже є `.github/workflows/release.yml`: він на тег збирає самодостатні бінарники
+(Windows — статичний executable без VC++ Runtime, Linux — tar.gz) і прикріплює їх до GitHub Release.
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Після цього на сторінці **Releases** буде `turbo-v0.1.0-windows-x64.zip` — саме його качає
+кінцевий користувач. `mockcc.exe` у реліз не входить: це тестовий інструмент.
+
 Ліцензія: [MIT](LICENSE).
