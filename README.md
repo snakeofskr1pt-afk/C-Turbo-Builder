@@ -356,14 +356,50 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bench.ps1 -Root . -Compiler g
 
 ## Публікація на GitHub
 
-Мережа в цьому середовищі заблокована, тому репозиторій підготовлено локально, з комітами.
-Коли буде доступ — достатньо:
+Репозиторій уже підготовлений локально (гілка `main`, 7 комітів, без remote). Залишилось
+додати remote і запушити. У цьому середовищі мережа для процесів заблокована, тому push роби
+зі своєї машини/терміналу.
+
+**Варіант 1 — скрипт (рекомендую):**
+
+```powershell
+# спочатку подивитись, що буде зроблено, без мережі:
+powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git -DryRun
+
+# потім реально:
+powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git
+```
+
+Скрипт перевіряє git/коміти/identity, додає або оновлює `origin`, пушить `main`, створює тег
+`v0.1.0` і пушить його (це запускає Release-workflow). Параметри: `-Tag v0.1.0`, `-SkipTag`,
+`-DryRun`.
+
+**Варіант 2 — вручну:**
 
 ```powershell
 git remote add origin https://github.com/<ваш-акаунт>/cpp-turbo-builder.git
 git branch -M main
 git push -u origin main
+
+git tag v0.1.0
+git push origin v0.1.0      # -> GitHub Actions створить Release з turbo.exe
 ```
+
+**Авторизація.** На Windows стоїть Git Credential Manager, тому `git push` зазвичай відкриває
+вікно браузера для входу. Якщо пароль питають у терміналі — вводь не пароль від акаунта, а
+**Personal Access Token** (GitHub → Settings → Developer settings → Personal access tokens →
+Generate new token, scope `repo`). `gh` CLI не потрібен.
+
+**Підпис комітів.** Зараз вони підписані як `cpp-turbo-builder <cpp-turbo-builder@users.noreply.github.com>`.
+Щоб прив'язати до свого акаунта (необов'язково):
+
+```powershell
+git config user.name "Your Name"
+git config user.email "you@example.com"
+git rebase -r --root --exec "git commit --amend --no-edit --reset-author"
+```
+
+Детальніше — [docs/GITHUB.md](docs/GITHUB.md) (описи репозиторію, topics, текст релізу, чеклист).
 
 ### Що отримає той, хто скачав (Rust не потрібен)
 

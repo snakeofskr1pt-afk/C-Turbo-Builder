@@ -83,15 +83,29 @@ GitHub показує `README.md`; на початку нього є посил�
 
 1. `cargo fmt --all -- --check` і `cargo clippy --all-targets -- -D warnings` — чисті.
 2. `cargo test --offline` — 62 зелені.
-3. `git remote add origin https://github.com/<акаунт>/cpp-turbo-builder.git`
-4. `git branch -M main && git push -u origin main`
+3. `powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git -DryRun`
+   — переконатись, що план правильний (мережа не потрібна).
+4. Те саме без `-DryRun` — скрипт додасть remote, запушить `main` і тег `v0.1.0`.
+   (Вручну: `git remote add origin ...` → `git push -u origin main` → `git tag v0.1.0` → `git push origin v0.1.0`.)
 5. У Settings → General: Description (з п.1), Topics (п.2), Website — можна порожнім.
 6. Settings → Actions → General: дозволити workflows (для CI та Release).
 7. Перевірити, що GitHub визначив ліцензію MIT (має бути видно «MIT license» біля About).
-8. `git tag v0.1.0 && git push origin v0.1.0` → workflow Release збере бінарники й створить реліз.
+8. Після пушу тега — дочекатись зеленого Release-workflow, перевірити, що в релізі є
+   `turbo-v0.1.0-windows-x64.zip`.
 9. За бажанням: Social preview (Settings → General → Social preview) — картинка 1280×640.
 10. У `Cargo.toml` можна додати `repository = "https://github.com/<акаунт>/cpp-turbo-builder"`,
     коли буде відомий акаунт.
+
+**Авторизація:** Git Credential Manager відкриє браузер; якщо пароль питають у терміналі — це
+Personal Access Token зі scope `repo`, а не пароль від акаунта.
+
+**Підпис комітів:** зараз автор — `cpp-turbo-builder <cpp-turbo-builder@users.noreply.github.com>`.
+Щоб прив'язати до свого акаунта:
+```powershell
+git config user.name "Your Name"
+git config user.email "you@example.com"
+git rebase -r --root --exec "git commit --amend --no-edit --reset-author"
+```
 
 ## 6. Що варто сказати в першому коментарі/README, щоб не було розчарувань
 
