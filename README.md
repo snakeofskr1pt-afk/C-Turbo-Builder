@@ -371,7 +371,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://
 ```
 
 Скрипт перевіряє git/коміти/identity, додає або оновлює `origin`, пушить `main`, створює тег
-`v0.1.0` і пушить його (це запускає Release-workflow). Параметри: `-Tag v0.1.0`, `-SkipTag`,
+`v0.1.1` і пушить його (це запускає Release-workflow). Параметри: `-Tag v0.1.1`, `-SkipTag`,
 `-DryRun`.
 
 **Варіант 2 — вручну:**
@@ -381,8 +381,8 @@ git remote add origin https://github.com/snakeofskr1pt-afk/C-Turbo-Builder.git
 git branch -M main
 git push -u origin main
 
-git tag v0.1.0
-git push origin v0.1.0      # -> GitHub Actions створить Release з turbo.exe
+git tag v0.1.1
+git push origin v0.1.1      # -> GitHub Actions створить Release з turbo.exe
 ```
 
 **Авторизація.** На Windows стоїть Git Credential Manager, тому `git push` зазвичай відкриває
@@ -426,11 +426,36 @@ turbo.exe cache stats
 (Windows — статичний executable без VC++ Runtime, Linux — tar.gz) і прикріплює їх до GitHub Release.
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-Після цього на сторінці **Releases** буде `turbo-v0.1.0-windows-x64.zip` — саме його качає
-кінцевий користувач. `mockcc.exe` у реліз не входить: це тестовий інструмент.
+Після цього на сторінці **Releases** буде `turbo-windows-x64.zip` (плюс окремий `turbo.exe` і
+`turbo-linux-x64.tar.gz`) — саме їх качає кінцевий користувач. `mockcc.exe` у реліз не входить:
+це тестовий інструмент.
+
+### Сайт-лендинг (GitHub Pages)
+
+У репо є готова сторінка [`docs/index.html`](docs/index.html): темний лендинг з кнопками
+**Download for Windows / Linux / Just turbo.exe**, які качають архів з останнього релізу.
+Статичні посилання ведуть на `releases/latest/download/turbo-windows-x64.zip`, а маленький
+скрипт додатково підтягує реальні імена ассетів через GitHub API (тож працює навіть якщо
+ассет у релізі названий інакше).
+
+Увімкнути один раз:
+
+1. **Settings → Pages**
+2. **Source**: *Deploy from a branch*
+3. **Branch**: `main`, **folder**: `/docs` → **Save**
+4. Через 1–2 хвилини сайт буде тут:  
+   `https://snakeofskr1pt-afk.github.io/C-Turbo-Builder/`
+
+Кнопки скачування запрацюють, щойно існує хоч один Release. Для стабільних імен файлів
+(`turbo-windows-x64.zip`, `turbo.exe`, `turbo-linux-x64.tar.gz`) запуш новий тег:
+
+```powershell
+git tag v0.1.1
+git push origin v0.1.1
+```
 
 Ліцензія: [MIT](LICENSE).

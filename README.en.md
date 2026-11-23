@@ -162,6 +162,17 @@ CI workflow.
 4. Optional BLAKE3 hashing backend behind a feature flag.
 5. `turbo.json` profiles (`build`, `release`) and config inheritance.
 
+## Website
+
+[`docs/index.html`](docs/index.html) is a self-contained landing page: **Download for Windows /
+Linux / just `turbo.exe`** buttons that download the latest release asset. Static links point at
+`releases/latest/download/turbo-windows-x64.zip`; a small script also resolves the real asset URLs
+through the GitHub API, so older release naming keeps working.
+
+Enable it once in **Settings → Pages**: source *Deploy from a branch*, branch `main`, folder
+`/docs`. The page is then served at `https://snakeofskr1pt-afk.github.io/C-Turbo-Builder/`.
+Downloads require at least one published release.
+
 ## Why this shape?
 
 - **One binary** (`turbo fastcache` + `turbo build` subcommands): the original plan had a Go

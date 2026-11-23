@@ -54,7 +54,7 @@ Measured on the proxy: ~22 ms per cache hit for a typical unit. Cold-build speed
 project (chunks are fewer compiler invocations, but big TUs cost more than small ones).
 62 tests, offline `cargo build`, MIT licensed. Windows and Linux; prebuilt binaries in Releases.
 
-Honest v0.1.0 caveats: not yet validated against a real MSVC/GCC toolchain by the author, system
+Honest v0.1.1 caveats: not yet validated against a real MSVC/GCC toolchain by the author, system
 headers are not hashed, no PCH support yet.
 
 Repo: https://github.com/snakeofskr1pt-afk/C-Turbo-Builder
@@ -79,17 +79,18 @@ cpp build-tool compile-cache unity-build rust cli msvc gcc clang windows increme
 
 (GitHub: Settings → Topics або шестірня біля About.)
 
-## 3. Опис релізу v0.1.0 (English, готовий до вставки)
+## 3. Опис релізу v0.1.1 (English, готовий до вставки)
 
 ```markdown
-Prebuilt binaries for cpp-turbo-builder v0.1.0.
+Prebuilt binaries for cpp-turbo-builder v0.1.1.
 
 `turbo` is a content-addressed compile cache + Unity Build orchestrator for C++.
 One static binary, no Rust required to run it.
 
 ## Download
-- `turbo-v0.1.0-windows-x64.zip` — Windows 10/11 x64: `turbo.exe` + `drag-build.cmd` + docs.
-- `turbo-v0.1.0-linux-x64.tar.gz` — Linux x64.
+- `turbo-windows-x64.zip` — Windows 10/11 x64: `turbo.exe` + `drag-build.cmd` + docs.
+- `turbo.exe` — just the executable (Windows x64).
+- `turbo-linux-x64.tar.gz` — Linux x64.
 
 ## Quick start
 ```powershell
@@ -100,7 +101,7 @@ Or drop a project folder onto `drag-build.cmd`.
 You still need a C++ compiler (`g++`, `clang++` or `cl.exe`) — `turbo` caches and orchestrates,
 it does not compile by itself.
 
-## What's inside v0.1.0
+## What's inside v0.1.1
 - Content-addressed object cache: SHA-256 over source + all transitively included headers +
   flags + compiler identity.
 - Unity Build: chunk sources, compile chunks in parallel, link once.
@@ -118,6 +119,7 @@ no PCH support yet. See README for details.
 
 - `README.md` — українською (основний).
 - `README.en.md` — англійською, для міжнародної аудиторії.
+- `docs/index.html` — лендинг для GitHub Pages (кнопки «Download for Windows/Linux»).
 
 GitHub показує `README.md`; на початку нього є посилання на англійську версію.
 
@@ -125,18 +127,20 @@ GitHub показує `README.md`; на початку нього є посил�
 
 1. `cargo fmt --all -- --check` і `cargo clippy --all-targets -- -D warnings` — чисті.
 2. `cargo test --offline` — 62 зелені.
-3. `powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/<акаунт>/cpp-turbo-builder.git -DryRun`
+3. `powershell -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -RepoUrl https://github.com/snakeofskr1pt-afk/C-Turbo-Builder.git -DryRun`
    — переконатись, що план правильний (мережа не потрібна).
-4. Те саме без `-DryRun` — скрипт додасть remote, запушить `main` і тег `v0.1.0`.
-   (Вручну: `git remote add origin ...` → `git push -u origin main` → `git tag v0.1.0` → `git push origin v0.1.0`.)
+4. Те саме без `-DryRun` — скрипт додасть remote, запушить `main` і тег `v0.1.1`.
+   (Вручну: `git remote add origin ...` → `git push -u origin main` → `git tag v0.1.1` → `git push origin v0.1.1`.)
 5. У Settings → General: Description (з п.1), Topics (п.2), Website — можна порожнім.
 6. Settings → Actions → General: дозволити workflows (для CI та Release).
 7. Перевірити, що GitHub визначив ліцензію MIT (має бути видно «MIT license» біля About).
 8. Після пушу тега — дочекатись зеленого Release-workflow, перевірити, що в релізі є
-   `turbo-v0.1.0-windows-x64.zip`.
-9. За бажанням: Social preview (Settings → General → Social preview) — картинка 1280×640.
-10. У `Cargo.toml` можна додати `repository = "https://github.com/<акаунт>/cpp-turbo-builder"`,
-    коли буде відомий акаунт.
+   `turbo-windows-x64.zip`, `turbo.exe` і `turbo-linux-x64.tar.gz`.
+9. **Settings → Pages**: Source = *Deploy from a branch*, Branch = `main`, folder = `/docs`, Save.
+   Через 1–2 хвилини сайт: `https://snakeofskr1pt-afk.github.io/C-Turbo-Builder/`.
+10. За бажанням: Social preview (Settings → General → Social preview) — картинка 1280×640.
+11. `repository` у `Cargo.toml` уже вказує на
+    https://github.com/snakeofskr1pt-afk/C-Turbo-Builder — нічого міняти не треба.
 
 **Авторизація:** Git Credential Manager відкриє браузер; якщо пароль питають у терміналі — це
 Personal Access Token зі scope `repo`, а не пароль від акаунта.
@@ -151,7 +155,7 @@ git rebase -r --root --exec "git commit --amend --no-edit --reset-author"
 
 ## 6. Що варто сказати в першому коментарі/README, щоб не було розчарувань
 
-- Це **v0.1.0**: інструмент працює й покритий тестами, але на реальному великому C++-проєкті
+- Це **v0.1.1**: інструмент працює й покритий тестами, але на реальному великому C++-проєкті
   його ще ніхто не міряв — тому в README є розділ «Скільки це економить» з моделлю, а не
   вигаданими цифрами.
 - Кеш допомагає на **повторних** збірках; перша збірка проєкту буде такою ж довгою, як і без

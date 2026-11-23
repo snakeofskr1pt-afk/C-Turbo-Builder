@@ -17,7 +17,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoUrl = "",
-    [string]$Tag = "v0.1.0",
+    [string]$Tag = "v0.1.1",
     [switch]$SkipTag,
     [switch]$DryRun,
     [switch]$Force

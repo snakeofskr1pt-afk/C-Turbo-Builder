@@ -1,7 +1,7 @@
 name: Release
 
 # Push a tag to publish prebuilt binaries, e.g.:
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag v0.1.1 && git push origin v0.1.1
 #
 # Users who download the release do NOT need Rust: turbo.exe is a single static
 # executable. They only need a C++ compiler (g++/cl) for their own project.
@@ -31,18 +31,27 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item target/x86_64-pc-windows-msvc/release/turbo.exe dist/
+          Copy-Item target/x86_64-pc-windows-msvc/release/turbo.exe ./turbo.exe
           Copy-Item README.md dist/
           Copy-Item LICENSE dist/
           Copy-Item drag-build.cmd dist/
-          Compress-Archive -Path dist/* -DestinationPath "turbo-${{ github.ref_name }}-windows-x64.zip"
+          # Stable asset names so the landing page can link to
+          # .../releases/latest/download/turbo-windows-x64.zip forever.
+          Compress-Archive -Path dist/* -DestinationPath "turbo-windows-x64.zip"
       - uses: softprops/action-gh-release@v2
         with:
-          files: turbo-${{ github.ref_name }}-windows-x64.zip
+          files: |
+            turbo-windows-x64.zip
+            turbo.exe
           body: |
             Prebuilt `turbo.exe` — single static binary, **Rust is not required**.
 
             You still need a C++ compiler on your machine (`g++` or `cl.exe`):
             `turbo` is a cache/orchestrator on top of it, not a compiler itself.
+
+            Downloads:
+            - `turbo-windows-x64.zip` — `turbo.exe` + `drag-build.cmd` + docs
+            - `turbo.exe` — just the executable
 
             Quick start: drop a project folder onto `drag-build.cmd`, or run
             `turbo build --root <project> -- g++ -Iinclude -O2` in a terminal.
@@ -63,7 +72,7 @@ jobs:
           mkdir -p dist
           cp target/release/turbo dist/
           cp README.md LICENSE dist/
-          tar -czf "turbo-${GITHUB_REF_NAME}-linux-x64.tar.gz" -C dist .
+          tar -czf "turbo-linux-x64.tar.gz" -C dist .
       - uses: softprops/action-gh-release@v2
         with:
-          files: turbo-${{ github.ref_name }}-linux-x64.tar.gz
+          files: turbo-linux-x64.tar.gz

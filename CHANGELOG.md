@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-11-23
+
+Landing page and stable release assets.
+
+### Added
+
+- **Landing page** (`docs/index.html`) for GitHub Pages: one-click “Download for Windows / Linux /
+  just turbo.exe”, resolving the latest release assets through the GitHub API (with static
+  fallbacks, so the page also works offline or when rate-limited).
+- `turbo.exe` is now published as a standalone Windows release asset next to the zip.
+
+### Changed
+
+- Release assets use stable, version-independent names (`turbo-windows-x64.zip`,
+  `turbo-linux-x64.tar.gz`), so `releases/latest/download/<name>` links never break between
+  versions.
+
 ## [0.1.0] - 2026-11-23
 
 First public release. Everything is implemented on `std` only — the project builds offline
@@ -42,4 +59,5 @@ with nothing but `rustc`.
 - No PCH support; the include scanner is intentionally naive (safe over-approximation).
 - Two simultaneous misses on the same key may compile twice (correct, just redundant).
 
+[0.1.1]: https://github.com/snakeofskr1pt-afk/C-Turbo-Builder/releases/tag/v0.1.1
 [0.1.0]: https://github.com/snakeofskr1pt-afk/C-Turbo-Builder/releases/tag/v0.1.0
