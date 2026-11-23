@@ -7,6 +7,7 @@ use crate::util;
 use crate::{TurboError, TurboResult};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,7 +141,18 @@ pub fn compile(
         )));
     }
 
-    store(&key, object, &cached, &opts.cache_dir)?;
+    // The cache is an optimisation, not a reason to fail a build: a read-only
+    // profile, a locked directory or a full disk must only disable caching.
+    if !CACHE_DISABLED.load(Ordering::Relaxed) {
+        if let Err(error) = store(&key, object, &cached, &opts.cache_dir) {
+            if !CACHE_DISABLED.swap(true, Ordering::Relaxed) {
+                eprintln!(
+                    "[turbo] warning: cannot write to cache `{}`: {error}. Continuing without cache.",
+                    opts.cache_dir.display()
+                );
+            }
+        }
+    }
     log(
         opts,
         &format!(
@@ -152,6 +164,10 @@ pub fn compile(
     );
     Ok(Outcome::Miss)
 }
+
+/// Set after the first cache write failure: avoids retrying (and spamming
+/// warnings) for every remaining unit in the same build.
+static CACHE_DISABLED: AtomicBool = AtomicBool::new(false);
 
 /// A cached object must exist and be non-empty; a zero-length file indicates a
 /// crashed writer (we write atomically, so this should be impossible — belt and

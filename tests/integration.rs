@@ -12,7 +12,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const TURBO: &str = env!("CARGO_BIN_EXE_turbo");
@@ -574,6 +574,75 @@ fn broken_turbo_json_is_reported() {
     assert!(
         stderr.contains("turbo.json"),
         "error must name the config file, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn directory_argument_builds_like_drag_and_drop() {
+    // `turbo C:\project` (or dropping a folder onto turbo.exe) is shorthand for
+    // `turbo build --root C:\project`.
+    let sandbox = Sandbox::new("drop");
+    sandbox.write("src/a.cpp", "int main(){return 0;}\n");
+
+    let mut command = sandbox.command();
+    command.arg(&sandbox.dir).arg("--").arg(MOCKCC);
+    let output = command.output().expect("run turbo <dir>");
+    assert_success(&output);
+    assert!(sandbox.executable().is_file());
+    assert_eq!(sandbox.compile_count(), 1);
+}
+
+#[test]
+fn positional_root_after_build_subcommand() {
+    let sandbox = Sandbox::new("posroot");
+    sandbox.write("src/a.cpp", "int main(){return 0;}\n");
+
+    let mut command = sandbox.command();
+    command.arg("build").arg(&sandbox.dir).arg("--").arg(MOCKCC);
+    let output = command.output().expect("run turbo build <dir>");
+    assert_success(&output);
+    assert!(sandbox.executable().is_file());
+}
+
+#[test]
+fn pause_flag_does_not_hang_without_stdin() {
+    // `--pause` is for launchers (double-click, drag & drop): it waits for
+    // Enter. With a closed stdin it must return immediately.
+    let sandbox = Sandbox::new("pause");
+    sandbox.write("src/a.cpp", "int main(){return 0;}\n");
+
+    let mut command = sandbox.command();
+    command.stdin(Stdio::null());
+    command
+        .args(["build", "--root", ".", "--pause", "--"])
+        .arg(MOCKCC);
+    let output = command.output().expect("run turbo build --pause");
+    assert_success(&output);
+}
+
+#[test]
+fn unwritable_cache_dir_does_not_break_the_build() {
+    // The cache is an optimisation: if it cannot be written, the build must
+    // still succeed — just without caching.
+    let sandbox = Sandbox::new("readonlycache");
+    sandbox.write("src/a.cpp", "int main(){return 0;}\n");
+    // A regular file used as a parent directory guarantees create_dir_all fails.
+    sandbox.write("blocked", "not a directory");
+
+    let mut command = sandbox.command();
+    command
+        .env("TURBO_CACHE_DIR", sandbox.dir.join("blocked").join("cache"))
+        .args(["build", "--root", ".", "--", MOCKCC]);
+    let output = command.output().expect("run turbo build");
+    assert_success(&output);
+    assert!(
+        sandbox.executable().is_file(),
+        "the executable must be produced even when the cache is unusable"
+    );
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("cannot write to cache"),
+        "a warning about the unusable cache is expected, got:\n{stderr}"
     );
 }
 

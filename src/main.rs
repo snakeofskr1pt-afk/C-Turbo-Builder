@@ -27,7 +27,7 @@ USAGE
 
   turbo build [--root DIR] [--jobs N] [--chunk-size N] [--out FILE]
               [--linker PATH] [--cache-dir DIR] [--config FILE] [--no-config]
-              [--quiet] [-v]
+              [--quiet] [-v] [--pause]
               -- <compiler> <compile flags...>
       Find all sources, glue them into unity chunks, compile in parallel through
       the cache, then link the executable. Without `--`, the compiler and flags
@@ -35,6 +35,11 @@ USAGE
       Example: turbo build -- g++ -Iinclude -O2
                turbo build --root . --out app.exe -- cl /O2 /Iinclude
                turbo build --root examples/cpp_demo          (turbo.json driven)
+
+  turbo <project-dir> [build options...] [-- <compiler> ...]
+      Shorthand for `turbo build --root <project-dir>`. You can drop a project
+      folder onto turbo.exe in Explorer and it will build it.
+      Example: turbo C:\\work\\mygame -- g++ -Iinclude -O2
 
   turbo hash [--manifest] -- <compiler> <compile flags...>
       Print the cache key and which files it covers (debugging tool).
@@ -75,6 +80,17 @@ fn run(mut argv: Vec<String>) -> turbo::TurboResult<i32> {
         print!("{HELP}");
         return Ok(0);
     }
+
+    // Drag & drop: `turbo.exe C:\path\to\project` behaves like
+    // `turbo build --root C:\path\to\project`, so a folder can be dropped onto
+    // the executable in Explorer.
+    if Path::new(&argv[0]).is_dir() {
+        let directory = argv.remove(0);
+        argv.insert(0, "--root".to_string());
+        argv.insert(1, directory);
+        return cmd_build(argv);
+    }
+
     let command = argv.remove(0);
     match command.as_str() {
         "-h" | "--help" | "help" => {
@@ -276,6 +292,7 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
     let mut cache_dir = util::cache_dir();
     let mut config_arg: Option<PathBuf> = None;
     let mut no_config = false;
+    let mut pause = false;
     let mut verbose = util::env_verbose();
     let mut quiet = false;
 
@@ -321,6 +338,16 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
             }
             "--verbose" | "-v" => {
                 verbose = true;
+                index += 1;
+            }
+            "--pause" => {
+                pause = true;
+                index += 1;
+            }
+            // Positional project directory: `turbo build C:\proj` and the
+            // drag-and-drop form `turbo.exe C:\proj`.
+            other if !other.starts_with('-') && root_arg.is_none() => {
+                root_arg = Some(PathBuf::from(other));
                 index += 1;
             }
             other => {
@@ -412,11 +439,11 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
         link_flags: config.link_flags.clone(),
     };
 
-    match orchestrator::build(&spec, &build_config)? {
+    let code = match orchestrator::build(&spec, &build_config)? {
         BuildResult::Success(summary) => {
             print_summary(&summary);
             eprintln!("[turbo] executable -> {}", summary.output.display());
-            Ok(0)
+            0
         }
         BuildResult::CompileFailed { summary, failure } => {
             print_summary(&summary);
@@ -426,18 +453,29 @@ fn cmd_build(argv: Vec<String>) -> turbo::TurboResult<i32> {
                 failure.source.display(),
                 failure.exit_code
             );
-            Ok(if failure.exit_code == 0 {
+            if failure.exit_code == 0 {
                 1
             } else {
                 failure.exit_code
-            })
+            }
         }
         BuildResult::LinkFailed { summary, exit_code } => {
             print_summary(&summary);
             eprintln!("[turbo] link failed, exit code {exit_code}");
-            Ok(if exit_code == 0 { 1 } else { exit_code })
+            if exit_code == 0 {
+                1
+            } else {
+                exit_code
+            }
         }
+    };
+
+    if pause {
+        eprintln!("[turbo] press Enter to close...");
+        let mut line = String::new();
+        let _ = std::io::stdin().read_line(&mut line);
     }
+    Ok(code)
 }
 
 fn print_summary(summary: &orchestrator::BuildSummary) {

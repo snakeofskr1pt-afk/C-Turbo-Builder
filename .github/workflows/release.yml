@@ -33,6 +33,7 @@ jobs:
           Copy-Item target/x86_64-pc-windows-msvc/release/turbo.exe dist/
           Copy-Item README.md dist/
           Copy-Item LICENSE dist/
+          Copy-Item drag-build.cmd dist/
           Compress-Archive -Path dist/* -DestinationPath "turbo-${{ github.ref_name }}-windows-x64.zip"
       - uses: softprops/action-gh-release@v2
         with:
@@ -42,6 +43,9 @@ jobs:
 
             You still need a C++ compiler on your machine (`g++` or `cl.exe`):
             `turbo` is a cache/orchestrator on top of it, not a compiler itself.
+
+            Quick start: drop a project folder onto `drag-build.cmd`, or run
+            `turbo build --root <project> -- g++ -Iinclude -O2` in a terminal.
 
   linux:
     name: linux-x64
