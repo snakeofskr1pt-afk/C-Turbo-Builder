@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The test suite itself needs no C++ compiler: it uses the bundled `mockcc`.
+  test:
+    name: build + test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (offline, zero dependencies)
+        run: cargo build --release --offline
+      - name: Test
+        run: cargo test --offline
+
+  # Prove the orchestrator works against a real C++ compiler and a real link step.
+  real-compiler:
+    name: real g++ end-to-end (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release --offline
+      - name: Unity build the demo project with g++
+        run: |
+          ./target/release/turbo build \
+            --root examples/cpp_demo \
+            --jobs 2 --chunk-size 2 \
+            --out /tmp/demo-app \
+            -- g++ -Iexamples/cpp_demo/include -O2
+          /tmp/demo-app
+      - name: Rebuild (everything should come from the cache)
+        run: |
+          ./target/release/turbo build \
+            --root examples/cpp_demo \
+            --jobs 2 --chunk-size 2 \
+            --out /tmp/demo-app \
+            -- g++ -Iexamples/cpp_demo/include -O2 2>&1 | tee /tmp/hot.log
+          grep -q "2 cache hit(s)" /tmp/hot.log
