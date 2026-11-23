@@ -1,0 +1,10 @@
+/target
+/.build/
+*.obj
+*.o
+*.pdb
+*.exe
+*.ilk
+*.lib
+/examples/**/.build/
+/examples/**/*.exe

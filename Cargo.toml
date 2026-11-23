@@ -1,0 +1,31 @@
+[package]
+name = "cpp-turbo-builder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Zero-dependency compile cache proxy and Unity Build orchestrator for C++"
+license = "MIT"
+readme = "README.md"
+keywords = ["cpp", "build", "cache", "unity-build", "compiler"]
+categories = ["development-tools::build-utils"]
+
+[lib]
+name = "turbo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "turbo"
+path = "src/main.rs"
+
+[[bin]]
+name = "mockcc"
+path = "src/bin/mockcc.rs"
+
+# Intentionally no dependencies: the whole toolchain must build offline with
+# nothing but rustc. Hash, thread pool, JSON-ish config and CLI parsing are
+# implemented on top of std only.
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
