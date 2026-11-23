@@ -120,6 +120,24 @@ fn stderr_of(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).to_string()
 }
 
+/// How many cached objects are in the cache directory.
+fn obj_count(cache: &Path) -> usize {
+    fs::read_dir(cache)
+        .map(|entries| {
+            entries
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry
+                        .path()
+                        .extension()
+                        .map(|ext| ext.eq_ignore_ascii_case("obj"))
+                        .unwrap_or(false)
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -268,6 +286,59 @@ fn fastcache_proxy_hits_and_copies_object() {
         first_object,
         "a recompiled unit reflects the new header content"
     );
+}
+
+#[test]
+fn fastcache_passes_through_non_compile_invocations() {
+    let sandbox = Sandbox::new("passthrough");
+    sandbox.write("src/a.cpp", "int main(){return 0;}\n");
+
+    // 1) A real compile goes through the cache.
+    let mut command = sandbox.command();
+    command
+        .args(["fastcache", "--cache-dir"])
+        .arg(&sandbox.cache)
+        .arg("--")
+        .arg(MOCKCC)
+        .args(["-c", "src/a.cpp", "-o", "a.obj"]);
+    assert_success(&command.output().expect("run fastcache"));
+    assert_eq!(sandbox.compile_count(), 1);
+    let cached_before = obj_count(&sandbox.cache);
+    assert_eq!(cached_before, 1);
+
+    // 2) Linking has no `-c`/`/c`: it must be forwarded verbatim, never cached.
+    let mut command = sandbox.command();
+    command
+        .args(["fastcache", "--cache-dir"])
+        .arg(&sandbox.cache)
+        .arg("--")
+        .arg(MOCKCC)
+        .args(["a.obj", "-o", "linked.exe"]);
+    assert_success(&command.output().expect("run fastcache"));
+    assert!(sandbox.dir.join("linked.exe").is_file());
+    assert_eq!(sandbox.link_count(), 1, "the linker must have run");
+    assert_eq!(sandbox.compile_count(), 1, "linking must not compile");
+    assert_eq!(
+        obj_count(&sandbox.cache),
+        cached_before,
+        "linking must not touch the cache"
+    );
+
+    // 3) Preprocess-only (-E) is forwarded too: output produced, nothing cached.
+    let mut command = sandbox.command();
+    command
+        .args(["fastcache", "--cache-dir"])
+        .arg(&sandbox.cache)
+        .arg("--")
+        .arg(MOCKCC)
+        .args(["-E", "src/a.cpp", "-o", "a.i"]);
+    assert_success(&command.output().expect("run fastcache"));
+    assert!(
+        sandbox.dir.join("a.i").is_file(),
+        "preprocessed output expected"
+    );
+    assert_eq!(sandbox.compile_count(), 1);
+    assert_eq!(obj_count(&sandbox.cache), cached_before);
 }
 
 #[test]

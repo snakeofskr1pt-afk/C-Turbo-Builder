@@ -154,11 +154,53 @@ fn parse_args(args: &[String]) -> ParsedArgs {
 
 fn run(args: &[String]) -> Result<(), String> {
     let parsed = parse_args(args);
-    if parsed.compile_mode {
+    if is_preprocess_only(args) {
+        preprocess(&parsed)
+    } else if parsed.compile_mode {
         compile(&parsed)
     } else {
         link(&parsed)
     }
+}
+
+/// `-E`, `-M`, `/P`, ... — never produce an object file.
+fn is_preprocess_only(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        matches!(
+            arg.to_ascii_lowercase().as_str(),
+            "/p" | "/ep" | "/e" | "-e" | "-m" | "-mm" | "-mg" | "-mmd"
+        )
+    })
+}
+
+fn preprocess(parsed: &ParsedArgs) -> Result<(), String> {
+    let source = parsed
+        .positional
+        .iter()
+        .find(|entry| is_source(entry))
+        .ok_or_else(|| "preprocess mode but no source file given".to_string())?;
+    let source_path = PathBuf::from(source);
+    let (combined, inputs) = collect_translation_unit(&source_path)?;
+    match parsed.object.clone().or_else(|| parsed.executable.clone()) {
+        Some(output) => {
+            if let Some(parent) = output.parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                }
+            }
+            fs::write(&output, &combined)
+                .map_err(|e| format!("cannot write `{}`: {e}", output.display()))?;
+            log(
+                "P",
+                &format!("{}\t{}\t{inputs}", source_path.display(), output.display()),
+            );
+        }
+        None => {
+            print!("{}", String::from_utf8_lossy(&combined));
+            log("P", &format!("{}\t-\t{inputs}", source_path.display()));
+        }
+    }
+    Ok(())
 }
 
 fn contains_error_marker(data: &[u8]) -> bool {
@@ -249,6 +291,19 @@ fn collect_translation_unit(root: &Path) -> Result<(Vec<u8>, usize), String> {
     Ok((combined, inputs))
 }
 
+/// Simulate the cost of a real compiler/linker so benchmarks can model a heavy
+/// C++ build (`TURBO_MOCK_COMPILE_MS`, `TURBO_MOCK_LINK_MS`). Tests never set
+/// these, so the suite stays fast.
+fn simulated_delay(variable: &str) {
+    if let Ok(raw) = std::env::var(variable) {
+        if let Ok(milliseconds) = raw.trim().parse::<u64>() {
+            if milliseconds > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(milliseconds));
+            }
+        }
+    }
+}
+
 fn compile(parsed: &ParsedArgs) -> Result<(), String> {
     let source = parsed
         .positional
@@ -270,6 +325,7 @@ fn compile(parsed: &ParsedArgs) -> Result<(), String> {
                 .unwrap_or_default()
         ),
     );
+    simulated_delay("TURBO_MOCK_COMPILE_MS");
     let (combined, inputs) = collect_translation_unit(&source_path)?;
     let object = parsed
         .object
@@ -313,6 +369,7 @@ fn link(parsed: &ParsedArgs) -> Result<(), String> {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
     }
+    simulated_delay("TURBO_MOCK_LINK_MS");
 
     let mut combined = sha256::Sha256::new();
     let mut lines = String::new();

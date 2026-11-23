@@ -154,7 +154,24 @@ fn cmd_fastcache(argv: Vec<String>) -> turbo::TurboResult<i32> {
         ));
     }
     let program = PathBuf::from(&command_line[0]);
-    let parsed = parse_invocation(&command_line[1..]).map_err(TurboError::msg)?;
+    let compiler_args = &command_line[1..];
+
+    // Only "compile this translation unit to an object" invocations are cached.
+    // Everything else (linking, preprocess-only, dependency-only, CMake compiler
+    // probes) is handed to the real compiler untouched — that is what makes the
+    // proxy safe to drop in front of an existing build system.
+    if !is_compile_invocation(compiler_args) {
+        if verbose {
+            eprintln!(
+                "[turbo] PASS (not a compile invocation): {} {}",
+                program.display(),
+                compiler_args.join(" ")
+            );
+        }
+        return passthrough(&program, compiler_args);
+    }
+
+    let parsed = parse_invocation(compiler_args).map_err(TurboError::msg)?;
     let cwd = std::env::current_dir()?;
     let spec = CompilerSpec::new(program, parsed.user_flags, cwd);
     let proxy_options = ProxyOptions::new(cache_dir, verbose);
@@ -163,6 +180,46 @@ fn cmd_fastcache(argv: Vec<String>) -> turbo::TurboResult<i32> {
         Outcome::Hit | Outcome::Miss => 0,
         Outcome::Failed(code) => code,
     })
+}
+
+/// `/c` or `-c` present and no "produce something else" mode (`-E`, `-M`, `/P`…).
+fn is_compile_invocation(args: &[String]) -> bool {
+    let mut has_compile_flag = false;
+    for arg in args {
+        let lower = arg.to_ascii_lowercase();
+        if lower == "/c" || lower == "-c" {
+            has_compile_flag = true;
+        }
+        // Preprocess-only / dependency-only / analyze-only invocations never
+        // produce an object file and must not be cached or rewritten.
+        if matches!(
+            lower.as_str(),
+            "/p" | "/ep"
+                | "/e"
+                | "-e"
+                | "-m"
+                | "-mm"
+                | "-mg"
+                | "-md"
+                | "-mmd"
+                | "/analyze"
+                | "-fsyntax-only"
+                | "-cxx-abi-check"
+        ) {
+            return false;
+        }
+    }
+    has_compile_flag
+}
+
+fn passthrough(program: &Path, args: &[String]) -> turbo::TurboResult<i32> {
+    let status = std::process::Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|e| {
+            TurboError::msg(format!("cannot run compiler `{}`: {e}", program.display()))
+        })?;
+    Ok(status.code().unwrap_or(1))
 }
 
 fn cmd_hash(argv: Vec<String>) -> turbo::TurboResult<i32> {
