@@ -1,5 +1,7 @@
 # cpp-turbo-builder
 
+> 🇬🇧 English version: [README.en.md](README.en.md) · 📜 Changelog: [CHANGELOG.md](CHANGELOG.md) · 🚀 Тексти для GitHub: [docs/GITHUB.md](docs/GITHUB.md)
+
 Кеш-проксі + оркестратор Unity Build для C++ — **один бінарник, нуль залежностей, збирається офлайн**.
 
 Ідея проста: C++ збирається повільно не через сам компілятор, а через те, що мільйон рядків

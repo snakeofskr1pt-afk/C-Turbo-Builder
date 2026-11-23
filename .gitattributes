@@ -1,0 +1,22 @@
+# Line ending policy — keeps the repo consistent across Windows/Linux checkouts.
+* text=auto
+
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.cpp   text eol=lf
+*.cc    text eol=lf
+*.h     text eol=lf
+
+# Windows shell scripts must keep CRLF.
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary artifacts
+*.exe   binary
+*.obj   binary
+*.png   binary
