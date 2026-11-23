@@ -7,22 +7,58 @@
 
 ## 1. Repository description («About»)
 
-Варіант A — короткий (рекомендую, ~90 символів):
+> GitHub обмежує поле About ~350 символами. Бери один варіант і вставляй у
+> Settings → General → Description (або шестірня біля About).
+
+### Рекомендований (180 символів)
 
 ```
-Content-addressed compile cache + Unity Build orchestrator for C++ — one zero-dependency binary.
+Content-addressed compile cache + Unity Build orchestrator for C++: hashes sources, headers, flags and compiler; reuses cached objects; compiles chunks in parallel. One binary, zero deps.
 ```
 
-Варіант B — трохи детальніший (~150 символів):
+### Короткий (112 символів)
 
 ```
-Speed up C++ builds: hash every translation unit, reuse cached objects, compile Unity Build chunks in parallel. Single binary, no deps.
+C++ build accelerator: content-addressed object cache + parallel Unity Build in one zero-dependency binary.
 ```
 
-Варіант C — технічний, для тих, хто шукає ccache-альтернативу:
+### Технічний — для тих, хто шукає ccache-альтернативу (146 символів)
 
 ```
-ccache-style object cache (SHA-256 over source + all headers + flags) plus parallel Unity Build orchestration for g++/clang++/cl.exe.
+ccache-style object cache keyed on source + all headers + flags + compiler identity, plus parallel Unity Build orchestration for g++ / clang++ / cl.exe.
+```
+
+### Українською — для постів у Telegram/Reddit/DOU (не для GitHub)
+
+```
+turbo — кеш об'єктів + Unity Build для C++ в одному бінарнику без залежностей: хешує джерело разом з усіма заголовками й флагами, не компілює незмінене, паралельно збирає чанки. Працює як обгортка над g++/clang++/cl і як самостійний оркестратор.
+```
+
+### Анонс англійською (для release notes, Reddit r/cpp, Hacker News)
+
+```markdown
+**turbo** — a small C++ build accelerator in a single, dependency-free binary.
+
+It hashes each translation unit together with every header it includes, so unchanged files are
+never compiled twice; sources are also glued into Unity Build chunks that compile in parallel.
+Use it as a drop-in launcher for an existing CMake/make build (`turbo fastcache -- g++ ...`) or let
+it drive the build and link the executable (`turbo build -- g++ -Iinclude -O2`).
+
+Measured on the proxy: ~22 ms per cache hit for a typical unit. Cold-build speed-up depends on the
+project (chunks are fewer compiler invocations, but big TUs cost more than small ones).
+62 tests, offline `cargo build`, MIT licensed. Windows and Linux; prebuilt binaries in Releases.
+
+Honest v0.1.0 caveats: not yet validated against a real MSVC/GCC toolchain by the author, system
+headers are not hashed, no PCH support yet.
+
+Repo: https://github.com/<account>/cpp-turbo-builder
+```
+
+### Social preview (картинка 1280×640, текст на ній)
+
+```
+turbo
+C++ builds: cache what didn't change
 ```
 
 > ⚠️ Не пиши «5× faster C++ builds» чи «blazing fast». Реальне прискорення залежить від проєкту,
